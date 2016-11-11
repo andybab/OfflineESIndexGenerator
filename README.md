@@ -1,7 +1,7 @@
 # OfflineESIndexGenerator
 Offline Elasticsearch(ES) index generator.
 
-Generates ES index using Apache Spark and stores snapshots of indices in HDFS. From there indices can be restored using [ES HDFS repository plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/repository-hdfs.html)
+Based on [MyPureCloud/elasticsearch-lambda](https://github.com/MyPureCloud/elasticsearch-lambda). Generates ES index using Apache Spark and stores snapshots of indices in HDFS. From there indices can be restored using [ES HDFS repository plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/repository-hdfs.html)
 
 ##Dependencies
 This project depends on shaded ES client libraries. A sample Maven project to build them can be found [here](https://github.com/andybab/es-shaded)
