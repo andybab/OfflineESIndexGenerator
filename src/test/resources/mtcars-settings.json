@@ -1,0 +1,13 @@
+{
+  "index.query.default_field": "path",
+  "analysis": {
+    "analyzer": {
+      "custom_text": {
+        "filter": [
+          "lowercase"
+        ],
+        "tokenizer": "whitespace"
+      }
+    }
+  }
+}
