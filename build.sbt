@@ -3,18 +3,18 @@ import sbt.Keys._
 lazy val root = (project in file(".")).
   settings(
     name := "OfflineESIndex",
-    version := "2.3.2",
+    version := "2.3.3",
     scalaVersion := "2.10.6",
     mainClass in Compile := Some("sk.eset.dbsystems.OfflineESIndexGenerator"),
     exportJars := true,
     retrieveManaged := true
   )
 
-libraryDependencies += "org.apache.spark" % "spark-core_2.10" % "1.6.0-cdh5.8.0" // % "provided"
+libraryDependencies += "org.apache.spark" % "spark-core_2.10" % "1.6.0-cdh5.9.0" // % "provided"
 
-libraryDependencies += "org.apache.spark" % "spark-sql_2.10" % "1.6.0-cdh5.8.0" // % "provided"
+libraryDependencies += "org.apache.spark" % "spark-sql_2.10" % "1.6.0-cdh5.9.0" // % "provided"
 
-libraryDependencies += "org.apache.spark" % "spark-catalyst_2.10" % "1.6.0-cdh5.8.0" // % "provided"
+libraryDependencies += "org.apache.spark" % "spark-catalyst_2.10" % "1.6.0-cdh5.9.0" // % "provided"
 
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.3.0"
 libraryDependencies += "sk.eset.dbsystems" % "es-shaded" % "1.2"

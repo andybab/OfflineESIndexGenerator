@@ -2,12 +2,13 @@ package sk.eset.dbsystems
 
 import java.io.File
 
+import com.cloudera.org.joda.time.IllegalInstantException
+import my.elasticsearch.joda.time.{DateTime, DateTimeZone, IllegalFieldValueException}
 import my.elasticsearch.joda.time.format.{DateTimeFormat, DateTimeFormatter}
-import my.elasticsearch.joda.time.{DateTime, DateTimeZone, IllegalFieldValueException, IllegalInstantException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import sk.eset.dbsystems.spark._
 /**
   * Created by andrej.babolcai on 24. 2. 2016.
@@ -28,11 +29,16 @@ object OfflineIndexer {
                      mappingFile: File = new File("."),
                      settingsFile: File = new File("."),
                      tableSchema: Seq[(String,String)] = Seq(),
-                     extractedFieldMapping: Map[String,String] = Map())
+                     extractedFieldMapping: Map[String,String] = Map(),
+                     partitionByField: Option[String] = None)
 
   def parseArgs(args: Array[String]): Option[Config] = {
     val parser = new scopt.OptionParser[Config]("offline-indexer") {
       head("offline-indexer")
+
+      opt[String]('P', "partitionByField") optional() action {
+        (x, c) => c.copy(partitionByField = Some(x))
+      } text "Field by which Spark partitions the data"
 
       opt[Int]('p', "indexShardCnt") required() action {
         (x,c) => c.copy(numShards = x)
@@ -116,6 +122,8 @@ object OfflineIndexer {
       return
     }
 
+    print("count {}", df.count())
+
     val zoneBratislava: DateTimeZone = DateTimeZone.forID("Europe/Bratislava")
     val zoneUTC: DateTimeZone = DateTimeZone.forID("UTC")
     val datetimeFormatterBratislava: DateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").withZone(zoneBratislava)
@@ -141,21 +149,42 @@ object OfflineIndexer {
 
     val broadcastedExtractedFieldMapping = sc.broadcast(fieldMapping)
     //Extract fields to index to a tuple
-    val toIndexRdd = df.map(
-      row => broadcastedExtractedFieldMapping.value.map(
-        mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
-      )
-    )
 
-    toIndexRdd.repartition(config.numShards).saveToESSnapshot(
-      config.workDirName,
-      config.indexName,
-      config.documentType,
-      FileUtils.readFileToString(config.mappingFile),
-      FileUtils.readFileToString(config.settingsFile),
-      config.snapshotName,
-      config.snapshotName,
-      config.destDFSDir,
-      config.hadoopConfResource)
+    //If partitioning field is defined, prepare RDD as key,value and partition acording to it
+    if (config.partitionByField.isDefined) {
+      val toIndexRdd = df.map(
+        row => (row.getAs[String](config.partitionByField.get), broadcastedExtractedFieldMapping.value.map(
+          mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
+        ))
+      )
+
+      toIndexRdd.partitionBy(new HashPartitioner(config.numShards)).map(x => x._2).saveToESSnapshot(
+        config.workDirName,
+        config.indexName,
+        config.documentType,
+        FileUtils.readFileToString(config.mappingFile),
+        FileUtils.readFileToString(config.settingsFile),
+        config.snapshotName,
+        config.snapshotName,
+        config.destDFSDir,
+        config.hadoopConfResource)
+    } else {
+      val toIndexRdd = df.map(
+        row => broadcastedExtractedFieldMapping.value.map(
+          mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
+        )
+      )
+
+      toIndexRdd.repartition(config.numShards).saveToESSnapshot(
+        config.workDirName,
+        config.indexName,
+        config.documentType,
+        FileUtils.readFileToString(config.mappingFile),
+        FileUtils.readFileToString(config.settingsFile),
+        config.snapshotName,
+        config.snapshotName,
+        config.destDFSDir,
+        config.hadoopConfResource)
+    }
   }
 }
