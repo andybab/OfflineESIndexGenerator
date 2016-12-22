@@ -16,7 +16,7 @@ libraryDependencies += "org.apache.spark" % "spark-sql_2.10" % "1.6.0-cdh5.9.0" 
 
 libraryDependencies += "org.apache.spark" % "spark-catalyst_2.10" % "1.6.0-cdh5.9.0" // % "provided"
 
-libraryDependencies += "com.github.scopt" %% "scopt" % "3.3.0"
+libraryDependencies += "com.github.scopt" %% "scopt" % "3.5.0"
 libraryDependencies += "sk.eset.dbsystems" % "es-shaded" % "1.2"
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.6.2"
 
