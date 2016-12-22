@@ -18,7 +18,8 @@ package object spark {
                          snapshotrepoName: String,
                          snapshotName: String,
                          destDFSDir: String,
-                         hadoopConfResources: Seq[String]
+                         hadoopConfResources: Seq[String],
+                         _IDField:Option[String]
                         ):Unit = {
 
       Product1
@@ -34,10 +35,12 @@ package object spark {
         snapshotrepoName,
         snapshotName,
         destDFSDir,
-        hadoopConfResources
+        hadoopConfResources,
+        _IDField
       )
       //Run job
       rdd.sparkContext.runJob(rdd, esWriter.processPartition _)
     }
   }
 }
+

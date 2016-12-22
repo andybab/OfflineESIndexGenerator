@@ -32,7 +32,8 @@ class ESWriter(numPartitions: Int,
                snapshotrepoName: String,
                snapshotName: String,
                destDFSDir: String,
-               hadoopConfResources: Seq[String]
+               hadoopConfResources: Seq[String],
+               _IDField: Option[String]
               ) extends Serializable {
   @transient
   private val logger: Logger = LoggerFactory.getLogger(classOf[ESWriter])
@@ -40,10 +41,8 @@ class ESWriter(numPartitions: Int,
   private def getIndexRequest(data: Map[String, Object]): IndexRequest = {
     val indexRequest = new IndexRequest()
 
-    val _ID: String = "_id"
-
     //Extract _id field value
-    val (_id, dataFiltered) = if (data.contains(_ID)) (data(_ID), data - _ID) else (None, data)
+    val (_id:Option[String], dataFiltered:Map[String,Object]) = if(_IDField.isDefined && data.contains(_IDField.get)) (Option(data(_IDField.get)), data - _IDField.get) else (None, data)
 
     val dataJavaMap: java.util.Map[String, Object] = new util.HashMap[String, Object]()
     dataFiltered.foreach(x => dataJavaMap.put(x._1, x._2))
@@ -52,7 +51,7 @@ class ESWriter(numPartitions: Int,
     indexRequest.index(indexName).`type`(documentType) routing "SAME_VALUE"
 
     //Add document id
-    indexRequest.id(_id.toString)
+    if(_id.isDefined) indexRequest.id(_id.get.toString) else indexRequest
   }
 
   private def getBulkRequest(bulkData: Seq[Map[String, Object]]): BulkRequest = {

@@ -3,8 +3,8 @@ package sk.eset.dbsystems
 import java.io.File
 
 import com.cloudera.org.joda.time.IllegalInstantException
-import my.elasticsearch.joda.time.{DateTime, DateTimeZone, IllegalFieldValueException}
 import my.elasticsearch.joda.time.format.{DateTimeFormat, DateTimeFormatter}
+import my.elasticsearch.joda.time.{DateTime, DateTimeZone, IllegalFieldValueException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructType
@@ -30,11 +30,16 @@ object OfflineIndexer {
                      settingsFile: File = new File("."),
                      tableSchema: Seq[(String,String)] = Seq(),
                      extractedFieldMapping: Map[String,String] = Map(),
-                     partitionByField: Option[String] = None)
+                     partitionByField: Option[String] = None,
+                     idField: Option[String] = None)
 
   def parseArgs(args: Array[String]): Option[Config] = {
     val parser = new scopt.OptionParser[Config]("offline-indexer") {
       head("offline-indexer")
+
+      opt[String]('I', "idField") optional() action {
+        (x, c) => c.copy(idField = Some(x))
+      } text "Field which value should be used as ID in elasticsearch"
 
       opt[String]('P', "partitionByField") optional() action {
         (x, c) => c.copy(partitionByField = Some(x))
@@ -115,14 +120,34 @@ object OfflineIndexer {
     val sqlContext = new SQLContext(sc)
 
     //Read parquet to data frame
-    val df = sqlContext.read.schema(schemaStruct).parquet(config.inputData:_*)
+    val dfTemp = sqlContext.read.schema(schemaStruct).parquet(config.inputData:_*)
+
+    import org.apache.spark.sql.functions._ // for `when` and other spark sql functions
+    //Modify ID field if necessary, get original idField value or sha1 of concatenated all non null string fields
+    val df =
+      if(config.idField.isDefined)
+        //Here we check if config.idField is null and when it is
+        dfTemp.withColumn(config.idField.get,  //Replace id column
+          when(dfTemp(config.idField.get).isNull, //when id column is null
+            //we compute sha1 sum of a string that is a concatenation of all string fields, null fields are replaced with empty string ("")
+            sha1(
+              concat(
+                //Get a array of column names
+                dfTemp.columns
+                  .map( col ) //convert them to Spark Columns
+                  .map(x =>
+                    when(x.isNull, "") //replace null columns with ""
+                      .otherwise(x))   //when column is not null retain original value
+              :_*) //Expand array so it can be used in concat function
+            ) //Compute sha1 of concatenated fields
+          )
+          .otherwise(dfTemp(config.idField.get))) // when id column is not null retain original value
+      else dfTemp
 
     //Check if response is null
     if (null == df) {
       return
     }
-
-    print("count {}", df.count())
 
     val zoneBratislava: DateTimeZone = DateTimeZone.forID("Europe/Bratislava")
     val zoneUTC: DateTimeZone = DateTimeZone.forID("UTC")
@@ -135,8 +160,8 @@ object OfflineIndexer {
       try {
         DateTime.parse(x, datetimeFormatterBratislava).toDate
       } catch {
-        case ifve:IllegalFieldValueException => null
-        case iie:IllegalInstantException => DateTime.parse(x, datetimeFormatterUTC).toDate
+        case _:IllegalFieldValueException => null
+        case _:IllegalInstantException => DateTime.parse(x, datetimeFormatterUTC).toDate
         case exc:Exception => throw new RuntimeException(exc.getMessage)
       }
     }
@@ -167,7 +192,9 @@ object OfflineIndexer {
         config.snapshotName,
         config.snapshotName,
         config.destDFSDir,
-        config.hadoopConfResource)
+        config.hadoopConfResource,
+        config.idField
+      )
     } else {
       val toIndexRdd = df.map(
         row => broadcastedExtractedFieldMapping.value.map(
@@ -184,7 +211,10 @@ object OfflineIndexer {
         config.snapshotName,
         config.snapshotName,
         config.destDFSDir,
-        config.hadoopConfResource)
+        config.hadoopConfResource,
+        config.idField
+      )
     }
   }
 }
+
