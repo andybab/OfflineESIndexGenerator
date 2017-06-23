@@ -16,7 +16,6 @@ import org.elasticsearch.cluster.metadata.IndexMetaData
 import org.elasticsearch.common.settings.Settings
 import org.elasticsearch.common.util.concurrent.UncategorizedExecutionException
 import org.elasticsearch.node.Node
-import org.elasticsearch.node.NodeBuilder._
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -83,6 +82,7 @@ class ESWriter(numPartitions: Int,
           val snapshotDirectoryName: String = indexDirPath.toString + "/repo_" + indexName
           val nodeSettings: Settings = Settings.builder
             .put("http.enabled", false)
+            .put("transport.type", "local")
             .put("processors", 1)
             .put(IndexMetaData.SETTING_NUMBER_OF_SHARDS, 1)
             .put("node.name", "ESWriter_" + indexName + context.partitionId())
@@ -102,7 +102,7 @@ class ESWriter(numPartitions: Int,
             .put("path.home", "bla")
             .build
 
-          val node: Node = nodeBuilder().settings(nodeSettings).local(true).node()
+          val node: Node = new Node(nodeSettings)
           node.start
           val client: Client = node.client
 
