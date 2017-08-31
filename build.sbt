@@ -16,6 +16,9 @@ libraryDependencies += "org.apache.spark" % "spark-sql_2.10" % "1.6.0-cdh5.11.0"
 
 libraryDependencies += "org.apache.spark" % "spark-catalyst_2.10" % "1.6.0-cdh5.11.0" // % "provided"
 
+libraryDependencies += "org.apache.logging.log4j" % "log4j-api" % "2.8.2"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.8.2"
+
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.5.0"
 libraryDependencies += "sk.eset.dbsystems" % "es-shaded" % "2.0"
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.6.2"

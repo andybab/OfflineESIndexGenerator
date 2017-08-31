@@ -1,15 +1,20 @@
 package sk.eset.dbsystems
 
 import java.io.File
+import java.util.UUID
+import scala.util.parsing.json._
 
 import com.cloudera.org.joda.time.IllegalInstantException
 import my.elasticsearch.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import my.elasticsearch.joda.time.{DateTime, DateTimeZone, IllegalFieldValueException}
 import org.apache.commons.io.FileUtils
+import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import sk.eset.dbsystems.spark._
+
+import scala.io.Source
 /**
   * Created by andrej.babolcai on 24. 2. 2016.
   *
@@ -104,6 +109,11 @@ object OfflineIndexer {
 
     //Run parser
     parser.parse(args, Config())
+  }
+
+  def get_xdna_something(xdna:String): Map[String,Int] = {
+    val len = xdna.length
+    return Map("count" -> len, "constant" -> 0)
   }
 
   def main(args: Array[String]): Unit = {
@@ -215,6 +225,33 @@ object OfflineIndexer {
         config.idField
       )
     }
+
+    println("All should be done, merge indices")
+
+    ///Merge partitions
+    //config hadoop
+    val conf = new org.apache.hadoop.conf.Configuration()
+    config.hadoopConfResource.map(new File(_).toURI.toURL).foreach(conf.addResource)
+    val dfsClient = org.apache.hadoop.fs.FileSystem.get(conf)
+
+    val local_index_0_filename = UUID.randomUUID().toString + "_index-0.json"
+
+    dfsClient.copyToLocalFile(
+      new Path(config.destDFSDir + "/to_resolve/" + config.indexName + "/index-0"),
+      new Path(local_index_0_filename)
+    )
+
+    //Open and read index-0 file content
+    val bufferedSource = Source.fromFile(local_index_0_filename)
+    val fileContents = bufferedSource.getLines().mkString("")
+    bufferedSource.close
+
+    val input_0_data = JSON.parseFull(fileContents)
+    val globalMap = input_0_data.get.asInstanceOf[Map[String,Any]]
+    val indexMap = globalMap.get("indices").get.asInstanceOf[Map[String,Any]].get(config.indexName).get.asInstanceOf[Map[String,Any]]
+    val indexId:String  = indexMap.get("id").get.asInstanceOf[String]
+    val metaUUID:String = indexMap.get("snapshots").get.asInstanceOf[List[Map[String,Any]]].head.get("uuid").get.asInstanceOf[String]
+    println(s"indexId $indexId, metaUUID $metaUUID")
   }
 }
 
