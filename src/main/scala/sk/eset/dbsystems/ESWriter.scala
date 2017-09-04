@@ -4,6 +4,7 @@ import java.io.File
 import java.{lang, util}
 
 import org.apache.commons.io.FileUtils
+import org.apache.commons.io.FilenameUtils
 import org.apache.commons.io.filefilter.DirectoryFileFilter
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -174,25 +175,37 @@ class ESWriter(numPartitions: Int,
           val dfsClient = org.apache.hadoop.fs.FileSystem.get(conf)
 
           import scala.collection.JavaConversions._
-          //Find shard directory with data
           
           val destDFSIndexDirPath = destDFSDir + "/to_resolve/" + indexName + "/"
 
-          val indexDir: String = FileUtils.listFilesAndDirs(
+          val indexDirAbsPath: String = FileUtils.listFilesAndDirs(
             new File(snapshotDirectoryName + "/indices"), DirectoryFileFilter.DIRECTORY, DirectoryFileFilter.DIRECTORY)
             //Tail to skip parent directory
-            .tail.maxBy(FileUtils.sizeOfDirectory).toString + "/"
+            .tail.maxBy(FileUtils.sizeOfDirectory).toString
 
-          println(s"Copying $indexDir to $destDFSIndexDirPath")
+          //Resolve shard with data
+          val shardWithDataAbsPath: String = FileUtils.listFilesAndDirs(
+            new File(indexDirAbsPath), DirectoryFileFilter.DIRECTORY, DirectoryFileFilter.DIRECTORY)
+            //Tail to skip parent directory
+            .tail.maxBy(FileUtils.sizeOfDirectory).toString
 
-          dfsClient.mkdirs(new Path(destDFSIndexDirPath + "/indices/"))
+          //Get ES index directory name
+          val esIndexDirName = FilenameUtils.getName(indexDirAbsPath)
+
+          //Construct destination path, if partition == 0, copy to es index directory name
+          val destDFSIndexDirPathDataDir = destDFSIndexDirPath +
+            "indices/" +
+            (if(0 == context.partitionId()) esIndexDirName else "")
+
+          //We also rename source shard number based on context.partitionId()
+          println(s"Copying $shardWithDataAbsPath to $destDFSIndexDirPathDataDir/${context.partitionId()}")
+          dfsClient.mkdirs(new Path(destDFSIndexDirPathDataDir))
 
           //Copy data to hdfs
           dfsClient.copyFromLocalFile(false, true,
-            new Path(indexDir),
-            new Path(destDFSIndexDirPath + "/indices/"))
+            new Path(shardWithDataAbsPath),
+            new Path(destDFSIndexDirPathDataDir + "/" + context.partitionId().toString))
 
-          //println(destDFSIndexDirPath)
           //If partition id 0 copy also top level snapshot information
           if (context.partitionId() == 0) {
             val snapshotInfoFiles = FileUtils.listFiles(new File(snapshotDirectoryName), null, false)
