@@ -9,6 +9,7 @@ import org.apache.commons.io.filefilter.DirectoryFileFilter
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.spark.TaskContext
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
 import org.elasticsearch.action.bulk.BulkRequest
 import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.client.Client
@@ -65,7 +66,7 @@ class ESWriter(numPartitions: Int,
       block(resource)
     } finally {
       if (resource != null) {
-        //FileUtils.deleteDirectory(new java.io.File(resource.toString))
+        FileUtils.deleteDirectory(new java.io.File(resource.toString))
       }
     }
   }
@@ -149,8 +150,8 @@ class ESWriter(numPartitions: Int,
             client.admin().cluster().prepareCreateSnapshot(snapshotrepoName, snapshotName).setWaitForCompletion(true).setIndices(indexName).get()
 
             ///Delete index
-            //logger.info("Deleting index {}", indexName)
-            //client.admin().indices().delete(new DeleteIndexRequest(indexName))
+            logger.info("Deleting index {}", indexName)
+            client.admin().indices().delete(new DeleteIndexRequest(indexName))
 
             logger.info("Closing handlers")
 
@@ -162,11 +163,6 @@ class ESWriter(numPartitions: Int,
             client.close()
             node.close()
           }
-
-          //??????????????????????????
-          //TODO skopirovat cele snapshot repo z kazdej shardu/spark_particie
-          // a potom v skripte po skonceni spark jobu pospajat shardy
-          //??????????????????????????
 
           ///Copy generated snapshots to hdfs
           //config hadoop
@@ -198,7 +194,7 @@ class ESWriter(numPartitions: Int,
             (if(0 == context.partitionId()) esIndexDirName else "")
 
           //We also rename source shard number based on context.partitionId()
-          println(s"Copying $shardWithDataAbsPath to $destDFSIndexDirPathDataDir/${context.partitionId()}")
+          logger.info(s"Copying $shardWithDataAbsPath to $destDFSIndexDirPathDataDir/${context.partitionId()}")
           dfsClient.mkdirs(new Path(destDFSIndexDirPathDataDir))
 
           //Copy data to hdfs
@@ -206,7 +202,7 @@ class ESWriter(numPartitions: Int,
             new Path(shardWithDataAbsPath),
             new Path(destDFSIndexDirPathDataDir + "/" + context.partitionId().toString))
 
-          //If partition id 0 copy also top level snapshot information
+          //If partition id 0 copy also top level snapshot information and index meta file
           if (context.partitionId() == 0) {
             val snapshotInfoFiles = FileUtils.listFiles(new File(snapshotDirectoryName), null, false)
 
@@ -214,31 +210,18 @@ class ESWriter(numPartitions: Int,
               new Path(x.getAbsolutePath),
               new Path(destDFSIndexDirPath)))
 
-            /*//We only copy .../index file if it does not exist
-            val indexFilePath: Path = new Path(snapshotDirectoryName + "/indices")
-            if (!dfsClient.exists(indexFilePath)) {
-              logger.info(s"Copping to $destDFSIndexDirPath")
-              dfsClient.copyFromLocalFile(false, true,
-                indexFilePath,
-                new Path(destDFSIndexDirPath))
-            }
+            val indexDirMetaFile  = FileUtils.listFiles(new File(indexDirAbsPath), null, false)
 
-            dfsClient.copyFromLocalFile(false, true,
-              new Path(snapshotDirectoryName + "/meta-*"),
-              new Path(destDFSDir))
-            dfsClient.copyFromLocalFile(false, true,
-              new Path(snapshotDirectoryName + "/snap-*"),
-              new Path(destDFSDir))
-            dfsClient.copyFromLocalFile(false, true,
-              new Path(snapshotDirectoryName + "/indices/" + indexName + "/meta-" + snapshotName + ".dat"),
-              new Path(destDFSDir + "/indices/" + indexName + "/meta-" + snapshotName + ".dat"))*/
+            indexDirMetaFile.foreach(x => dfsClient.copyFromLocalFile(false, true,
+              new Path(x.getAbsolutePath),
+              new Path(destDFSIndexDirPathDataDir)))
           } 
 
           dfsClient.close()
         }
       }
     } catch {
-      case x: UncategorizedExecutionException => println(x)
+      case x: UncategorizedExecutionException => logger.error("Caught exception",x)
         throw x
     }
   }

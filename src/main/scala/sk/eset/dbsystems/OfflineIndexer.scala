@@ -12,15 +12,16 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
+import org.slf4j.{Logger, LoggerFactory}
 import sk.eset.dbsystems.spark._
 
-import scala.collection.convert.WrapAsScala
 import scala.io.Source
 /**
   * Created by andrej.babolcai on 24. 2. 2016.
   *
   */
 object OfflineIndexer {
+  private val logger: Logger = LoggerFactory.getLogger(getClass)
   case class Config(
                      numShards:Int = 1,
                      indexName: String = "",
@@ -110,11 +111,6 @@ object OfflineIndexer {
 
     //Run parser
     parser.parse(args, Config())
-  }
-
-  def get_xdna_something(xdna:String): Map[String,Int] = {
-    val len = xdna.length
-    return Map("count" -> len, "constant" -> 0)
   }
 
   def main(args: Array[String]): Unit = {
@@ -227,7 +223,7 @@ object OfflineIndexer {
       )
     }
 
-    println("All should be done, merge indices")
+    logger.info("All should be done, merge indices")
 
     ///Merge partitions
     //config hadoop
@@ -252,7 +248,7 @@ object OfflineIndexer {
     val indexMap = globalMap("indices").asInstanceOf[Map[String,Any]](config.indexName).asInstanceOf[Map[String,Any]]
     val indexId:String  = indexMap("id").asInstanceOf[String]
     val metaUUID:String = indexMap("snapshots").asInstanceOf[List[Map[String,Any]]].head("uuid").asInstanceOf[String]
-    println(s"indexId $indexId, metaUUID $metaUUID")
+    logger.debug(s"indexId $indexId, metaUUID $metaUUID")
 
     //We need to rename snap-... .dat files in all directories
     for( a <- 1 until config.numShards) {
@@ -279,7 +275,7 @@ object OfflineIndexer {
           a +
           "/snap-" + metaUUID + ".dat" )
 
-      print(s"rename ${snapPath.get.toString} to ${destSnapPath.toString}")
+      logger.info(s"Renaming ${snapPath.get.toString} to ${destSnapPath.toString}")
       //Rename snap file
       dfsClient.rename(snapPath.get, destSnapPath)
 
@@ -287,11 +283,14 @@ object OfflineIndexer {
       val destEsIndexPath = new Path(
         config.destDFSDir + "/to_resolve/" + config.indexName + "/indices/" + indexId + "/" + a
       )
-      print(s"rename $srcPathDir to ${destEsIndexPath.toString}")
+      logger.info(s"Rename $srcPathDir to ${destEsIndexPath.toString}")
       dfsClient.rename(new Path(srcPathDir), destEsIndexPath)
     }
 
-    //TODO cleanup
+    //Clean downloaded index-0 json file and crc file
+    logger.debug("Cleaning downloaded index-0 json file and crc")
+    FileUtils.deleteQuietly(new File(local_index_0_filename))
+    FileUtils.deleteQuietly(new File('.' + local_index_0_filename + ".crc"))
   }
 }
 
