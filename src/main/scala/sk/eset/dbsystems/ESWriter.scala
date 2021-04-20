@@ -14,8 +14,10 @@ import org.elasticsearch.action.bulk.BulkRequest
 import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.client.Client
 import org.elasticsearch.common.settings.Settings
+import org.elasticsearch.env.Environment
 import org.elasticsearch.common.util.concurrent.UncategorizedExecutionException
 import org.elasticsearch.node.Node
+import java.nio.file.Paths
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -80,6 +82,7 @@ class ESWriter(numPartitions: Int,
           val indexDirname = indexDirPath.toString + "/" + indexName + "_shard" + context.partitionId() + "_" + context.attemptNumber()
 
           val snapshotDirectoryName: String = indexDirPath.toString + "/repo_" + indexName
+          //val nodeEnvironment: Environment = org.elasticsearch.env.Environment.
           val nodeSettings: Settings = Settings.builder
             .put("http.enabled", false)
             .put("transport.type", "local")
@@ -94,14 +97,15 @@ class ESWriter(numPartitions: Int,
             .put("path.home", "bla")
             .build
 
-          val node: Node = new Node(nodeSettings)
+          val nodeEnvironment: Environment = new Environment(nodeSettings, null)
+          val node: Node = new Node(nodeEnvironment)
           node.start
           val client: Client = node.client
 
           try {
             client.admin.indices.prepareCreate(indexName)
               .setSettings(
-                Settings.builder.loadFromSource(indexSettings)
+                Settings.builder.loadFromSource(indexSettings, XContentFactory.jsonBuilder())
                   .put("number_of_shards", numPartitions)
                   .put("number_of_replicas", 0)
                   .put("refresh_interval", -1)
