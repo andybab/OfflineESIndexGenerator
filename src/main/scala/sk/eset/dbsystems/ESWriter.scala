@@ -17,6 +17,7 @@ import org.elasticsearch.common.settings.Settings
 import org.elasticsearch.env.Environment
 import org.elasticsearch.common.util.concurrent.UncategorizedExecutionException
 import org.elasticsearch.node.Node
+import org.elasticsearch.common.xcontent.XContentType
 import java.nio.file.Paths
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -105,7 +106,7 @@ class ESWriter(numPartitions: Int,
           try {
             client.admin.indices.prepareCreate(indexName)
               .setSettings(
-                Settings.builder.loadFromSource(indexSettings, XContentFactory.jsonBuilder())
+                Settings.builder.loadFromSource(indexSettings, XContentType.JSON)
                   .put("number_of_shards", numPartitions)
                   .put("number_of_replicas", 0)
                   .put("refresh_interval", -1)

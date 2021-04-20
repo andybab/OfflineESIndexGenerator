@@ -4,7 +4,7 @@ import java.io.File
 import java.util.UUID
 
 import scala.util.parsing.json._
-import com.cloudera.org.joda.time.IllegalInstantException
+import my.elasticsearch.joda.time.IllegalInstantException
 import my.elasticsearch.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 import my.elasticsearch.joda.time.{DateTime, DateTimeZone, IllegalFieldValueException}
 import org.apache.commons.io.FileUtils
@@ -183,14 +183,16 @@ object OfflineIndexer {
     //Extract fields to index to a tuple
 
     //If partitioning field is defined, prepare RDD as key,value and partition acording to it
+    import sqlContext.implicits._
     if (config.partitionByField.isDefined) {
       val toIndexRdd = df.map(
         row => (row.getAs[String](config.partitionByField.get), broadcastedExtractedFieldMapping.value.map(
           mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
         ))
-      )
+      ).rdd
 
-      toIndexRdd.partitionBy(new HashPartitioner(config.numShards)).map(x => x._2).saveToESSnapshot(
+      //toIndexRdd.partitionBy(new HashPartitioner(config.numShards)).map(x => x._2).saveToESSnapshot(
+      toIndexRdd.repartition(config.numShards).map(x => x._2).saveToESSnapshot(
         config.workDirName,
         config.indexName,
         config.documentType,
@@ -207,7 +209,7 @@ object OfflineIndexer {
         row => broadcastedExtractedFieldMapping.value.map(
           mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
         )
-      )
+      ).rdd
 
       toIndexRdd.repartition(config.numShards).saveToESSnapshot(
         config.workDirName,
