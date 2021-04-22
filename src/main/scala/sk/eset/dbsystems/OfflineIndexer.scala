@@ -11,6 +11,8 @@ import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql._
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import org.slf4j.{Logger, LoggerFactory}
 import sk.eset.dbsystems.spark._
@@ -183,13 +185,12 @@ object OfflineIndexer {
     //Extract fields to index to a tuple
 
     //If partitioning field is defined, prepare RDD as key,value and partition acording to it
-    import sqlContext.implicits._
     if (config.partitionByField.isDefined) {
-      val toIndexRdd = df.map(
+      val toIndexRdd = df.rdd.map(
         row => (row.getAs[String](config.partitionByField.get), broadcastedExtractedFieldMapping.value.map(
-          mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
+          mapping => (mapping._1, mapping._2._2(row.getAs(mapping._2._1).toString))
         ))
-      ).rdd
+      )
 
       //toIndexRdd.partitionBy(new HashPartitioner(config.numShards)).map(x => x._2).saveToESSnapshot(
       toIndexRdd.repartition(config.numShards).map(x => x._2).saveToESSnapshot(
@@ -205,11 +206,11 @@ object OfflineIndexer {
         config.idField
       )
     } else {
-      val toIndexRdd = df.map(
+      val toIndexRdd = df.rdd.map(
         row => broadcastedExtractedFieldMapping.value.map(
-          mapping => (mapping._1, mapping._2._2(row.getAs[String](mapping._2._1)))
+          mapping => (mapping._1, mapping._2._2(row.getAs(mapping._2._1).toString))
         )
-      ).rdd
+      )
 
       toIndexRdd.repartition(config.numShards).saveToESSnapshot(
         config.workDirName,

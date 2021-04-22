@@ -3,6 +3,8 @@ package sk.eset.dbsystems
 import java.io.File
 import java.{lang, util}
 
+import scala.collection.JavaConverters._
+import scala.collection.Seq
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.FilenameUtils
 import org.apache.commons.io.filefilter.DirectoryFileFilter
@@ -18,6 +20,8 @@ import org.elasticsearch.env.Environment
 import org.elasticsearch.common.util.concurrent.UncategorizedExecutionException
 import org.elasticsearch.node.Node
 import org.elasticsearch.common.xcontent.XContentType
+import org.elasticsearch.transport.Netty4Plugin;
+import org.elasticsearch.transport.netty4.Netty4Transport
 import java.nio.file.Paths
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -85,21 +89,19 @@ class ESWriter(numPartitions: Int,
           val snapshotDirectoryName: String = indexDirPath.toString + "/repo_" + indexName
           //val nodeEnvironment: Environment = org.elasticsearch.env.Environment.
           val nodeSettings: Settings = Settings.builder
-            .put("http.enabled", false)
-            .put("transport.type", "local")
-            .put("processors", 1)
             .put("node.name", "ESWriter_" + indexName + context.partitionId())
             .put("path.data", indexDirname)
             //.put("bootstrap.memory_lock", true)
-            .put("indices.store.throttle.type", "none")
             .put("indices.memory.index_buffer_size", "5%")
             .put("indices.fielddata.cache.size", "0%")
             .put("path.repo", snapshotDirectoryName)
             .put("path.home", "bla")
+            .put("network.host", "127.0.0.1")
+            .put("http.port", "19200")
             .build
 
           val nodeEnvironment: Environment = new Environment(nodeSettings, null)
-          val node: Node = new Node(nodeEnvironment)
+          val node: Node = new LocalNode(nodeSettings)
           node.start
           val client: Client = node.client
 
@@ -179,6 +181,7 @@ class ESWriter(numPartitions: Int,
           
           val destDFSIndexDirPath = destDFSDir + "/to_resolve/" + indexName + "/"
 
+          throw new Exception("---->" + snapshotDirectoryName)
           val indexDirAbsPath: String = FileUtils.listFilesAndDirs(
             new File(snapshotDirectoryName + "/indices"), DirectoryFileFilter.DIRECTORY, DirectoryFileFilter.DIRECTORY)
             //Tail to skip parent directory
@@ -231,3 +234,4 @@ class ESWriter(numPartitions: Int,
     }
   }
 }
+
