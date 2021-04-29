@@ -13,12 +13,13 @@ lazy val root = (project in file(".")).
 
 libraryDependencies += "org.apache.spark" % "spark-sql_2.11" % "2.3.4"  % "provided"
 libraryDependencies += "com.github.scopt" % "scopt_2.11" % "4.0.1"
-libraryDependencies += "sk.eset.dbsystems" % "es-shaded" % "4.1.1"
-libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.6.2"
-libraryDependencies += "org.apache.logging.log4j" % "log4j-api" % "2.8.2"
-libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.8.2"
-libraryDependencies += "org.elasticsearch.plugin" % "transport-netty4-client" % "7.12.0"
-libraryDependencies += "org.apache.lucene" % "lucene-core" % "8.8.0"
+libraryDependencies += "sk.eset.dbsystems" % "es-shaded" % "4.1.3"
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.12.3"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-api" % "2.14.1"
+libraryDependencies += "org.apache.logging.log4j" % "log4j-core" % "2.14.1"
+libraryDependencies += "org.elasticsearch.plugin" % "transport-netty4-client" % "7.0.1"
+libraryDependencies += "org.apache.lucene" % "lucene-core" % "8.1.1"
+libraryDependencies += "org.apache.lucene" % "lucene-backward-codecs" % "8.1.1"
 
 // There is a conflict between Guava/Jackson versions on Elasticsearch and Hadoop
 // Shading Guava Package

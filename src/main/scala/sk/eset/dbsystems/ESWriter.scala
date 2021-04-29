@@ -73,7 +73,7 @@ class ESWriter(numPartitions: Int,
       block(resource)
     } finally {
       if (resource != null) {
-        FileUtils.deleteDirectory(new java.io.File(resource.toString))
+       // FileUtils.deleteDirectory(new java.io.File(resource.toString))
       }
     }
   }
@@ -97,10 +97,10 @@ class ESWriter(numPartitions: Int,
             .put("path.repo", snapshotDirectoryName)
             .put("path.home", "bla")
             .put("network.host", "127.0.0.1")
-            .put("http.port", "19200")
+            .put("http.port", "59200-59300")
             .build
 
-          val nodeEnvironment: Environment = new Environment(nodeSettings, null)
+          System.setProperty("es.set.netty.runtime.available.processors", "false");
           val node: Node = new LocalNode(nodeSettings)
           node.start
           val client: Client = node.client
@@ -121,7 +121,7 @@ class ESWriter(numPartitions: Int,
               )
               .get
 
-            client.admin.indices.preparePutMapping(indexName).setType(documentType).setSource(mapping).get
+            client.admin.indices.preparePutMapping(indexName).setType(documentType).setSource(mapping, XContentType.JSON).get
 
             //Create snapshot settings
             val shouldCompress = new lang.Boolean(false)
@@ -181,7 +181,7 @@ class ESWriter(numPartitions: Int,
           
           val destDFSIndexDirPath = destDFSDir + "/to_resolve/" + indexName + "/"
 
-          throw new Exception("---->" + snapshotDirectoryName)
+          println("---->" + snapshotDirectoryName + "/indices")
           val indexDirAbsPath: String = FileUtils.listFilesAndDirs(
             new File(snapshotDirectoryName + "/indices"), DirectoryFileFilter.DIRECTORY, DirectoryFileFilter.DIRECTORY)
             //Tail to skip parent directory
