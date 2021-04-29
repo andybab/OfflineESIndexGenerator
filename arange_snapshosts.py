@@ -26,12 +26,33 @@ for line in output.splitlines():
       indices_data = { **output2_json["indices"], **indices_data }
 
       #move indices and *.dat files
-      c = subprocess.Popen(['hdfs', 'dfs', '-mv', entry + "/indices/*", dest_repo_path + "/indices/" ], stdout=subprocess.PIPE)
+      res1 = subprocess.Popen(['hdfs', 'dfs', '-ls', entry + "/indices/"], stdout=subprocess.PIPE) #, shell=True
+      (output3, err) = res1.communicate()
+
+      #Here we get the main shard path and .../1, .../2, ... shards
+      main_shard_str, *other_shards = sorted([x.rstrip('\'') for line2 in output3.splitlines() for x in str(line2).split(" ") if (to_resolve_path in x)], reverse=True)
+      #Get snap-.....dat name in main shard
+      res1 = subprocess.Popen(['hdfs', 'dfs', '-ls', main_shard_str + "/0/"], stdout=subprocess.PIPE) #, shell=True
+      (output3, err) = res1.communicate()
+      snap_path, *not_important = [x.rstrip('\'') for line2 in output3.splitlines() for x in str(line2).split(" ") if ("/0/snap-" in x)]
+      snap_name = snap_path.split("/")[-1]
+
+      #Copy main shard
+      c = subprocess.Popen(['hdfs', 'dfs', '-cp', main_shard_str, dest_repo_path + "/indices/" ], stdout=subprocess.PIPE)
       (output, err) = c.communicate()
-      c = subprocess.Popen(['hdfs', 'dfs', '-mv', entry + "/*.dat", dest_repo_path + "/" ], stdout=subprocess.PIPE)
+      c = subprocess.Popen(['hdfs', 'dfs', '-cp', entry + "/*.dat", dest_repo_path + "/" ], stdout=subprocess.PIPE)
       (output, err) = c.communicate()
-      c = subprocess.Popen(['hdfs', 'dfs', '-rm', '-skipTrash', '-r', '-f', entry ], stdout=subprocess.PIPE)
-      (output, err) = c.communicate()
+      for other_shard in other_shards:
+        #Copy other shards and rename snap-...dat files
+        dest_dir = dest_repo_path + "/indices/" + main_shard_str.split("/")[-1] + "/"
+        c = subprocess.Popen(['hdfs', 'dfs', '-cp', other_shard, dest_dir], stdout=subprocess.PIPE)
+        (output, err) = c.communicate()
+        c = subprocess.Popen(['hdfs', 'dfs', '-mv', dest_dir + other_shard.split("/")[-1] + "/snap-*", dest_dir + other_shard.split("/")[-1] + "/" + snap_name], stdout=subprocess.PIPE)
+        (output, err) = c.communicate()
+        
+     
+      #c = subprocess.Popen(['hdfs', 'dfs', '-rm', '-skipTrash', '-r', '-f', entry ], stdout=subprocess.PIPE)
+      #(output, err) = c.communicate()
 
 if 0 == len(snapshots_data):
   print("Nothing to do")
